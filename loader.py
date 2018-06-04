@@ -177,7 +177,7 @@ def load_testdata():
     return df
 
 
-def write_data(obj_code=1885, test_num=7, use_num=5000):
+def write_data(obj_code=1301, test_num=7, use_num=5000):
     '''
     データセットのcsv書き出し関数
     手動でやる場合はここのデフォルト値を書き換える

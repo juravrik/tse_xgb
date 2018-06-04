@@ -8,7 +8,7 @@ import xgboost as xgb
 
 from tqdm import tqdm
 
-from sklearn.model_selection import StratifiedKFold, ParameterGrid
+from sklearn.model_selection import train_test_split, ParameterGrid
 from sklearn.metrics import log_loss, accuracy_score
 
 import loader
@@ -49,8 +49,6 @@ def train():
 
     logger.info('data preparation end {}'.format(x_train.shape))
 
-    #バリデーション用の分割
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
 
     #パラメータチューン用のディクショナリ
     #とりあえず一回チューンしたのでその時のだけにしてある
@@ -73,45 +71,35 @@ def train():
 
 
     #パラメータチューン用のループ
-    #現状意味をなしてないけど書きなおすの面倒なので残ってる
     for params in tqdm(list(ParameterGrid(all_params))):
         logger.info('params: {}'.format(params))
 
         #記録用のダミーリスト
         list_logloss_score = []
         list_best_iterations = []
-        #交差検証用のループ
-        for train_idx, valid_idx in cv.split(x_train, y_train):
-            #選ばれたバリデーションセットを分離
-            trn_x = x_train.iloc[train_idx, :]
-            val_x = x_train.iloc[valid_idx, :]
 
-            #選ばれたトレインセットをまとめる
-            trn_y = y_train[train_idx]
-            val_y = y_train[valid_idx]
+        
+        trn_x, val_x, trn_y, val_y = train_test_split(
+                x_train, y_train, test_size=0.10, random_state=23)
 
-            #インスタンスの作成
-            clf = xgb.sklearn.XGBClassifier(**params)
-            #データから学習
-            clf.fit(trn_x,
-                    trn_y,
-                    eval_set=[(val_x, val_y)],
-                    early_stopping_rounds=100,
-                    eval_metric='logloss'
-                    )
+        clf = xgb.sklearn.XGBClassifier(**params)
+        clf.fit(trn_x,
+                trn_y,
+                eval_set=[(val_x, val_y)],
+                early_stopping_rounds=100,
+                eval_metric='logloss'
+                )
 
             #確率値で予測の出力
-            pred = clf.predict_proba(val_x, ntree_limit=clf.best_ntree_limit)[:, 1]
-            logger.debug('val_y: {}, pred: {}'.format(len(val_y), len(pred)))
+        pred = clf.predict_proba(val_x, ntree_limit=clf.best_ntree_limit)[:, 1]
+        logger.debug('val_y: {}, pred: {}'.format(len(val_y), len(pred)))
             #バリデーションセットに対するスコア(logloss)の計算
-            sc_logloss = log_loss(val_y, pred)
+        sc_logloss = log_loss(val_y, pred)
             #スコアを記録
-            list_logloss_score.append(sc_logloss)
+        list_logloss_score.append(sc_logloss)
             #
-            list_best_iterations.append(clf.best_iteration)
-            logger.debug('   logloss: {}'.format(sc_logloss))
-            #ここn_estimatorsちゃんとすればbreakしちゃってよさそう
-            #break
+        list_best_iterations.append(clf.best_iteration)
+        logger.debug('   logloss: {}'.format(sc_logloss))
 
         #現在のパラメータによるスコアの記録
         params['n_estimators'] = int(np.mean(list_best_iterations))
@@ -149,8 +137,8 @@ def pred():
     df = loader.load_testdata()
 
     x_test = df.drop('target', axis=1)
-    pred_test = clf.predict_proba(x_test)[:, 1]
-    #pred_test = clf.predict(x_test)
+    #pred_test = clf.predict_proba(x_test)[:, 1]
+    pred_test = clf.predict(x_test)
     pd.DataFrame(pred_test, columns=['predict']).to_csv(RESULT_DIR+'pred.csv', index=False)
 
 
