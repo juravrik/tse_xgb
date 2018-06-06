@@ -5,13 +5,15 @@ import quandl
 import pickle
 import requests
 import sys
+import json
 
 from tqdm import tqdm
 from logging import StreamHandler, DEBUG, Formatter, FileHandler, getLogger
 
-#quandlのAPIキー
+#quandlのAPIキーのロード
 #ユーザー登録するだけで無料で利用できるので自前のに書き換えてください
-quandl.ApiConfig.api_key = 'KTnN2zFQbpdFEM6zzLaJ'
+with open('conf.json') as f:
+    quandl.ApiConfig.api_key = json.load(f)['api']
 
 #データを保存するディレクトリ
 INPUT_DIR = 'dataset/'
